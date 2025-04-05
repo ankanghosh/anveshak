@@ -195,7 +195,7 @@ See the "Publishers" and "Sources" pages within the application for complete ack
 For a complete roadmap, see the [changelog](changelog-doc.md).
 
 ## Blog and Additional Resources
-Read our detailed blog post about the project: [Anveshak: Spirituality Q&A - Bridging Faith and Intelligence]([external_blog_link](https://researchguy.in/anveshak-spirituality-qa-bridging-faith-and-intelligence/))
+Read our detailed blog post about the project: [Anveshak: Spirituality Q&A - Bridging Faith and Intelligence](https://researchguy.in/anveshak-spirituality-qa-bridging-faith-and-intelligence/)
 
 ## 📜 License
 
