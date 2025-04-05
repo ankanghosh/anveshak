@@ -1,0 +1,49 @@
+# Secrets and Credentials
+.streamlit/secrets.toml
+*.env
+temp_credentials.json
+secrets.json
+
+# Data and Model Files
+metadata.jsonl
+faiss_index.faiss
+text_chunks.txt
+all_embeddings.npy
+*.npy
+*.pt
+*.pth
+*.bin
+
+# Python-specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.ipynb_checkpoints/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env/
+
+# Logs and Temporary Files
+logs/
+*.log
+temp/
+.tmp/
+
+# OS-specific Files
+.DS_Store
+Thumbs.db
+
+# IDE Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Deployment and Build
+*.egg-info/
+dist/
+build/

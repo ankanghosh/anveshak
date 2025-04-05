@@ -1,0 +1,10 @@
+streamlit
+torch
+transformers
+sentence-transformers
+faiss-cpu
+openai
+google-cloud-storage
+google-auth
+numpy
+accelerate
