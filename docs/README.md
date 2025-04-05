@@ -124,13 +124,15 @@ anveshak/
 ├── pages/                   # Streamlit pages
 │   ├── 1_Sources.py         # Sources information page
 │   ├── 2_Publishers.py      # Publisher acknowledgments page
-│   └── 3_Contacts.py        # Contact information page
+│   └── 3_Contact_us.py      # Contact information page
 ├── docs/                    # Documentation
-│   ├── architecture.md      # Architecture details
-│   ├── data_handling.md     # Data handling explanation
-│   └── configuration.md     # Configuration guide
+│   ├── architecture-doc.md      # Architecture details
+│   ├── data-handling-doc.md     # Data handling explanation
+│   ├── configuration-doc.md     # Configuration guide
+│   ├── changelog-doc.md         # Project change log
+│   └── README.md                # Project overview and instructions
 └── scripts/                 # Data processing scripts
-   └── preprocessing.py     # Text preprocessing script
+   └── preprocessing.ipynb   # Text preprocessing notebook
 ```
 
 ## 🔒 Data Privacy & Ethics
@@ -190,14 +192,14 @@ See the "Publishers" and "Sources" pages within the application for complete ack
 - **User feedback collection** for answer quality
 - **Personalized learning paths** based on user interests (implemented with privacy-preserving approaches like client-side storage, session-based preferences, or explicit opt-in)
 
-For a complete roadmap, see the [changelog](docs/changelog-doc.md).
+For a complete roadmap, see the [changelog](changelog-doc.md).
 
 ## Blog and Additional Resources
-Read our detailed blog post about the project: [Blog Title](external_blog_link)
+Read our detailed blog post about the project: [Anveshak: Spirituality Q&A - Bridging Faith and Intelligence]([external_blog_link](https://researchguy.in/anveshak-spirituality-qa-bridging-faith-and-intelligence/))
 
 ## 📜 License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](../LICENSE) file for details.
 
 ## 📞 Contact
 
