@@ -6,7 +6,7 @@
 A Retrieval-Augmented Generation (RAG) application that provides concise answers to spiritual questions by referencing a curated collection of Indian spiritual texts, philosophical treatises, and teachings from revered Saints, Sages, Siddhas, Yogis, Sadhus, Rishis, Gurus, Mystics, and Spiritual Masters of all genders, backgrounds, traditions, and walks of life.
 
 <p align="center">
-  <img src="docs/assets/app_screenshot.png" alt="Application Screenshot" width="800"/>
+  <img src="assets/app_screenshot.png" alt="Application Screenshot" width="800"/>
 </p>
 
 ## Overview
