@@ -333,7 +333,7 @@ ID  Title  Author  Text_Content
 
 ```json
 // Example metadata.jsonl entry
-{"Title": "Text_Name", "Author": "Vyasa", "Publisher": "Publisher_Name", "URL": "URL", "Uploaded": true}
+{"Title": "Example Title", "Author": "Example Author", "Publisher": "Example Publisher", "URL": "https://example.com", "Uploaded": true}
 ```
 
 ## Data Flow and Processing

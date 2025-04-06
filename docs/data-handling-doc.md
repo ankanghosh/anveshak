@@ -270,8 +270,8 @@ def fetch_metadata_from_gcs():
 
 Metadata structure (JSONL format):
 ```json
-{"Title": "Bhagavad Gita", "Author": "Vyasa", "Publisher": "Gita Press, Gorakhpur, India", "URL": "https://archive.org/details/bhagavad-gita", "Uploaded": true}
-{"Title": "Yoga Sutras", "Author": "Patanjali", "Publisher": "DIVINE LIFE SOCIETY", "URL": "https://archive.org/details/yoga-sutras", "Uploaded": true}
+{"Title": "Example Title 1", "Author": "Example Author 1", "Publisher": "Example Publisher 1", "URL": "https://example.com/1", "Uploaded": true}
+{"Title": "Example Title 2", "Author": "Example Author 2", "Publisher": "Example Publisher 2", "URL": "https://example.com/2", "Uploaded": false}
 ```
 
 ## Data Storage Architecture
