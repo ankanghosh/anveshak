@@ -349,7 +349,7 @@ common_questions = [
     "Are there rebirths?",
     "What is Karma?",
     "What is the ultimate truth?",
-    "What is Swami Vivekananda's opinion about the SELF?",
+    "What was Swami Vivekananda's opinion about the SELF?",
     "Explain moksha or salvation. Is that for real?",
     "Destiny or free will?",
     "What is the ultimate goal of human life?",
