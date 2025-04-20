@@ -140,8 +140,8 @@ and acknowledge their contribution to the world.
 We acknowledge the boundless grace, love, compassion, and kindness, of the great Saints and Siddhas who took on a physical body 
 to selflessly bless beings and guide them to the path to spirituality and the Lord. However, Saints are not required 
 to come to the physical plane for continuing with their work. We would like to take a moment to thank all of those 
-great beings, the enlightened ones, who visisted the physical world but remanined reclusive while working on their 
-paths, and the ones who never had to take a physical bode, for their invaluable contributions and divine guidance.
+great beings, the enlightened ones, who visited the physical world but remained reclusive while working on their 
+paths, and the ones who never had to take a physical body, for their invaluable contributions and divine guidance.
 """)
 st.markdown('</div>', unsafe_allow_html=True)
 
