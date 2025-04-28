@@ -115,24 +115,26 @@ This application is designed for deployment on [Hugging Face Spaces](https://hug
 
 ```
 anveshak/
-├── .gitignore               # Specifies intentionally untracked files to ignore
-├── .gitattributes           # Defines attributes for pathnames in the repository
-├── app.py                   # Main Streamlit application
-├── requirements.txt         # Python dependencies
-├── rag_engine.py            # Core RAG functionality
-├── utils.py                 # Utility functions for authentication
-├── pages/                   # Streamlit pages
-│   ├── 1_Sources.py         # Sources information page
-│   ├── 2_Publishers.py      # Publisher acknowledgments page
-│   └── 3_Contact_us.py      # Contact information page
-├── docs/                    # Documentation
-│   ├── architecture-doc.md      # Architecture details
-│   ├── data-handling-doc.md     # Data handling explanation
-│   ├── configuration-doc.md     # Configuration guide
-│   ├── changelog-doc.md         # Project change log
-│   └── README.md                # Project overview and instructions
-└── scripts/                 # Data processing scripts
-   └── preprocessing.ipynb   # Text preprocessing notebook
+├── .gitignore                # Specifies intentionally untracked files to ignore
+├── .gitattributes            # Defines attributes for pathnames in the repository
+├── app.py                    # Main Streamlit application
+├── requirements.txt          # Python dependencies
+├── rag_engine.py             # Core RAG functionality
+├── utils.py                  # Utility functions for authentication
+├── pages/                    # Streamlit pages
+│   ├── 1_Sources.py          # Sources information page
+│   ├── 2_Publishers.py       # Publisher acknowledgments page
+│   └── 3_Contact_us.py       # Contact information page
+├── docs/                     # Documentation
+│   └── assets/               # Images and other media
+│       └── app_screenshot.png # Application screenshot
+│   ├── architecture-doc.md   # Architecture details
+│   ├── data-handling-doc.md  # Data handling explanation
+│   ├── configuration-doc.md  # Configuration guide
+│   ├── changelog-doc.md      # Project change log
+│   ├── README.md             # Project overview and instructions
+└── scripts/                  # Data processing scripts
+    └── preprocessing.ipynb   # Text preprocessing notebook
 ```
 
 ## 🔒 Data Privacy & Ethics
