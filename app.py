@@ -190,16 +190,14 @@ div.stInfo {
 # Centered button layout without columns
 _, center_col, _ = st.columns([1, 2, 1])  # Create a wider center column
 with center_col:  # Put everything in the center column
-    if st.session_state.show_acknowledgment:
-        st.markdown('<div class="thank-you-button">', unsafe_allow_html=True)
-        if st.button("Hide Thank You Note", on_click=toggle_acknowledgment, disabled=st.session_state.is_processing, use_container_width=True):
-            pass
-        st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="thank-you-button">', unsafe_allow_html=True)
-        if st.button("Show Thank You Note", on_click=toggle_acknowledgment, disabled=st.session_state.is_processing, use_container_width=True):
-            pass
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="thank-you-button">', unsafe_allow_html=True)
+    
+    button_text = "Hide Thank You Note" if st.session_state.show_acknowledgment else "Show Thank You Note"
+    if st.button(button_text, on_click=toggle_acknowledgment, 
+                 disabled=st.session_state.is_processing, use_container_width=True):
+        pass
+        
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Preload resources during initialization
 # This ensures the model, index, and data are loaded before the user interacts with the app
@@ -320,7 +318,7 @@ common_questions = [
 st.markdown("### Few questions to try:")
 
 # Group questions into rows and create buttons (disabled if processing)
-question_rows = group_buttons(common_questions, max_chars_per_row=80)
+question_rows = group_buttons(common_questions)
 for row_idx, row in enumerate(question_rows):
     cols = st.columns(len(row))
     for i, (col, q) in enumerate(zip(cols, row)):
