@@ -18,19 +18,6 @@ st.markdown("""
     margin-bottom: 15px;
     font-size: 1.8rem;
 }
-.subsection-header {
-    color: #3f51b5;
-    margin-top: 20px;
-    margin-bottom: 10px;
-    font-size: 1.4rem;
-}
-.source-container {
-    background-color: #f8faff;
-    border: 1px solid #e1e4f2;
-    border-radius: 8px;
-    padding: 20px;
-    margin: 15px 0;
-}
 .featured-saints {
     background-color: #ffffff;
     border: 1px solid #e1e4f2;
@@ -38,9 +25,6 @@ st.markdown("""
     padding: 15px;
     margin: 15px 0;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-.tradition-section {
-    margin-bottom: 20px;
 }
 </style>
 <div class="main-title">About Sources</div>

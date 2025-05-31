@@ -24,10 +24,6 @@ st.markdown("""
     margin-top: 20px;
     margin-bottom: 15px;
 }
-.publisher-list {
-    margin-bottom: 10px;
-    line-height: 1.6;
-}
 </style>
 <div class="main-title">Publisher Acknowledgments</div>
 """, unsafe_allow_html=True)

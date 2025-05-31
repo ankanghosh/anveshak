@@ -246,7 +246,7 @@ def get_embedding(text):
     Generate embeddings for a text query using the cached model.
     
     Uses an in-memory cache to avoid redundant embedding generation for repeated queries.
-    Properly prefixes inputs with "query:" or "passage:" as required by the E5 model.
+    Prefixes inputs with "query:" as required by the E5 model for search queries.
     
     Args:
         text (str): The query text to embed
@@ -261,11 +261,10 @@ def get_embedding(text):
         tokenizer, model = cached_load_model()
         if model is None:
             print("Model is None, returning zero embedding")
-            return np.zeros((1, 384), dtype=np.float32)
+            return np.zeros((1, 1024), dtype=np.float32)
             
-        # Format input based on text length
-        # For E5 models, "query:" prefix is for questions, "passage:" for documents
-        input_text = f"query: {text}" if len(text) < 512 else f"passage: {text}"
+        # For E5 models, "query:" prefix is for questions. Passages use "passage:" prefix during preprocessing
+        input_text = f"query: {text}"
         inputs = tokenizer(
             input_text,
             padding=True,
@@ -285,7 +284,7 @@ def get_embedding(text):
         return embeddings
     except Exception as e:
         print(f"❌ Embedding error: {str(e)}")
-        return np.zeros((1, 384), dtype=np.float32)
+        return np.zeros((1, 1024), dtype=np.float32)
 
 def retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5, similarity_threshold=0.5):
     """
@@ -339,7 +338,7 @@ def retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5, s
         print(f"❌ Error in retrieve_passages: {str(e)}")
         return [], []
 
-def answer_with_llm(query, context=None, word_limit=100):
+def answer_with_llm(query, context=None, word_limit=200):
     """
     Generate an answer using the OpenAI GPT model with formatted citations.
     
@@ -443,7 +442,7 @@ def format_citations(sources):
     """
     formatted_citations = []
     for title, author, publisher in sources:
-        if publisher.endswith(('.', '!', '?')):
+        if publisher.endswith(('.')):
             formatted_citations.append(f"📚 {title} by {author}, Published by {publisher}")
         else:
             formatted_citations.append(f"📚 {title} by {author}, Published by {publisher}.")
@@ -454,7 +453,7 @@ def format_citations(sources):
 # =============================================================================
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def cached_process_query(query, top_k=5, word_limit=100):
+def cached_process_query(query, top_k=5, word_limit=200):
     """
     Process a user query with caching to avoid redundant computation.
     
@@ -499,7 +498,7 @@ def cached_process_query(query, top_k=5, word_limit=100):
     # Return the complete response package
     return {"query": query, "answer_with_rag": llm_answer_with_rag, "citations": sources}
 
-def process_query(query, top_k=5, word_limit=100):
+def process_query(query, top_k=5, word_limit=200):
     """
     Process a query through the RAG pipeline with proper formatting.
     

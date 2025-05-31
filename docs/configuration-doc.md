@@ -483,7 +483,7 @@ Used for caching query results with a time-to-live (TTL):
 
 ```python
 @st.cache_data(ttl=3600, show_spinner=False)
-def cached_process_query(query, top_k=5, word_limit=100):
+def cached_process_query(query, top_k=5, word_limit=200):
     # Cache query results for an hour
 ```
 

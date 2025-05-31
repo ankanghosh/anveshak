@@ -82,9 +82,9 @@ def setup_openai_auth():
     Setup OpenAI API authentication using various methods.
     
     This function tries multiple authentication methods in order of preference:
-    1. Standard environment variable (OPENAI_API_KEY)
-    2. HF Spaces environment variable (OPENAI_KEY) - this is our primary method,
+    1. HF Spaces environment variable (OPENAI_API_KEY) - this is our primary method,
        with API key stored exclusively in HF Spaces secrets for deployment
+    2. Standard local environment variable (OPENAI_KEY)
     3. Streamlit secrets (openai_api_key) - fallback method
     
     Note: In production, we exclusively use HF Spaces secrets for storing the OpenAI API key.
@@ -95,16 +95,16 @@ def setup_openai_auth():
         Exception: For any authentication errors
     """
     try:
-        # Option 1: Standard environment variable
+        # Option 1: HF Spaces environment variable (primary method)
         if "OPENAI_API_KEY" in os.environ:
             openai.api_key = os.getenv("OPENAI_API_KEY")
-            print("✅ Using OpenAI API key from environment variable")
+            print("✅ Using OpenAI API key from HF Spaces environment variable")
             return
             
-        # Option 2: HF Spaces environment variable with different name
+        # Option 2: Standard local environment variable
         elif "OPENAI_KEY" in os.environ:
             openai.api_key = os.getenv("OPENAI_KEY")
-            print("✅ Using OpenAI API key from HF Spaces environment variable")
+            print("✅ Using OpenAI API key from standard local environment variable")
             return
             
         # Option 3: Streamlit secrets

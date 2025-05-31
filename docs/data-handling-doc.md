@@ -537,7 +537,7 @@ This privacy-first approach ensures that users can freely explore spiritual ques
 To respect copyright and ensure fair use, answers are limited to a configurable word count using the actual implementation from rag_engine.py:
 
 ```python
-def answer_with_llm(query, context=None, word_limit=100):
+def answer_with_llm(query, context=None, word_limit=200):
     # ... LLM processing ...
     
     # Extract and format the answer

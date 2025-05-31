@@ -78,7 +78,7 @@ The backend layer handles the core functionality of processing queries, retrievi
 
 ```python
 @st.cache_data(ttl=3600, show_spinner=False)
-def cached_process_query(query, top_k=5, word_limit=100):
+def cached_process_query(query, top_k=5, word_limit=200):
     """
     Process a user query with caching to avoid redundant computation.
     
@@ -123,7 +123,7 @@ def cached_process_query(query, top_k=5, word_limit=100):
     # Return the complete response package
     return {"query": query, "answer_with_rag": llm_answer_with_rag, "citations": sources}
 
-def process_query(query, top_k=5, word_limit=100):
+def process_query(query, top_k=5, word_limit=200):
     """
     Process a query through the RAG pipeline with proper formatting.
     
@@ -208,7 +208,7 @@ ddef retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5, 
 - Formats the output with proper citations
 
 ```python
-def answer_with_llm(query, context=None, word_limit=100):
+def answer_with_llm(query, context=None, word_limit=200):
     """
     Generate an answer using the OpenAI GPT model with formatted citations.
     
@@ -390,7 +390,7 @@ def cached_load_data_files():
 
 ```python
 @st.cache_data(ttl=3600, show_spinner=False)
-def cached_process_query(query, top_k=5, word_limit=100):
+def cached_process_query(query, top_k=5, word_limit=200):
     # Cache query results for an hour
 ```
 

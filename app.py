@@ -21,13 +21,13 @@ if 'init_time' not in st.session_state:
     st.session_state.init_time = None
 if 'form_key' not in st.session_state:
     st.session_state.form_key = 0  # This will help us reset the form
-# New variable for debouncing: whether processing is in progress
+# Variable for debouncing: whether processing is in progress
 if 'is_processing' not in st.session_state:
     st.session_state.is_processing = False
 # Store the answer so that it persists on screen
 if 'last_answer' not in st.session_state:
     st.session_state.last_answer = None
-# Add new session state for showing/hiding acknowledgment
+# Add session state for showing/hiding acknowledgment
 if 'show_acknowledgment' not in st.session_state:
     st.session_state.show_acknowledgment = False
 # Add page change detection
@@ -132,37 +132,6 @@ div.stInfo {
     border: 1px solid #e1e4f2 !important;
     border-radius: 8px !important;
 }
-/* COMBINED SCROLL CONTAINER */
-.questions-scroll-container {
-    width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
-}
-/* Hide scrollbar for Chrome, Safari and Opera */
-.questions-scroll-container::-webkit-scrollbar {
-    display: none;
-}
-/* Inner content that holds both rows */
-.questions-content {
-    display: inline-flex;
-    flex-direction: column;
-    min-width: max-content;
-    gap: 10px;
-    padding: 5px 0;
-}
-/* Individual rows */
-.questions-row {
-    display: flex;
-    flex-direction: row;
-    gap: 10px;
-}
-/* Placeholder for buttons */
-.button-placeholder {
-    min-height: 38px;
-    min-width: 120px;
-    margin: 0 5px;
-}
 /* Acknowledgment section styling - fully fixed */
 .acknowledgment-container {
     background-color: #f8f5ff;
@@ -212,16 +181,6 @@ div.stInfo {
     justify-content: center;
     margin: 0 auto;
     width: 100%;
-}
-/* Source link styling */
-.source-link {
-    color: #3f51b5;
-    font-weight: bold;
-    text-decoration: underline;
-    cursor: pointer;
-}
-.source-link:hover {
-    color: #6a1b9a;
 }
 </style>
 <div class="main-title">Anveshak</div>
