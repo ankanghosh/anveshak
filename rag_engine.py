@@ -7,7 +7,6 @@ import torch.nn as nn
 from google.cloud import storage
 from transformers import AutoTokenizer, AutoModel
 import openai
-import textwrap
 import unicodedata
 import streamlit as st
 from utils import setup_gcp_auth, setup_openai_auth
