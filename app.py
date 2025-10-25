@@ -81,9 +81,9 @@ st.markdown("""
     border-radius: 20px !important;
     padding: 8px 16px !important;
     box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
 }
 /* Form submit button specific styling */
 button[type="submit"], 
@@ -302,11 +302,11 @@ def group_buttons(questions, max_chars_per_row=100):
 # Common spiritual questions for users to select from
 # These represent fundamental spiritual inquiries across traditions
 common_questions = [
-    "What is the Atman or the soul?",
+    "What is the Atman or soul?",
     "Are there rebirths?",
     "What is Karma?",
     "What is the ultimate truth?",
-    "What was Swami Vivekananda's opinion about the SELF?",
+    "Swami Vivekananda's opinion on the SELF?",
     "Explain moksha or salvation. Is that for real?",
     "Destiny or free will?",
     "What is the ultimate goal of human life?",

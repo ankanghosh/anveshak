@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from google.cloud import storage
 from transformers import AutoTokenizer, AutoModel
-import openai
+from openai import OpenAI
 import unicodedata
 import streamlit as st
 from utils import setup_gcp_auth, setup_openai_auth
@@ -54,7 +54,7 @@ def cached_load_model():
         tokenizer = AutoTokenizer.from_pretrained(embedding_model)
         model = AutoModel.from_pretrained(
             embedding_model,
-            torch_dtype=torch.float16
+            torch_dtype=torch.bfloat16
         )
         
         # Move model to CPU and set to eval mode for inference
@@ -80,19 +80,20 @@ def cached_load_data_files():
     - FAISS index for vector similarity search
     - Text chunks containing the original spiritual text passages
     - Metadata dictionary with publication and author information
+    - OpenAI client for answer generation
     
     All files are downloaded from Google Cloud Storage if not already present locally.
     
     Returns:
-        tuple: (faiss_index, text_chunks, metadata_dict) or (None, None, None) if loading fails
+        tuple: (faiss_index, text_chunks, metadata_dict, openai_client) or (None, None, None, None) if loading fails
     """
     # Initialize GCP and OpenAI clients
     bucket = setup_gcp_client()
-    openai_initialized = setup_openai_client()
+    openai_client = setup_openai_client()
     
-    if not bucket or not openai_initialized:
+    if not bucket or not openai_client:
         print("Failed to initialize required services")
-        return None, None, None
+        return None, None, None, None
     
     # Get GCS paths from secrets - required
     try:
@@ -102,7 +103,7 @@ def cached_load_data_files():
         text_chunks_file_gcs = st.secrets["CHUNKS_PATH_GCS"]
     except KeyError as e:
         print(f"❌ Error: Required GCS path not found in secrets: {e}")
-        return None, None, None
+        return None, None, None, None
     
     # Download necessary files if not already present locally
     success = True
@@ -112,14 +113,14 @@ def cached_load_data_files():
     
     if not success:
         print("Failed to download required files")
-        return None, None, None
+        return None, None, None, None
     
     # Load FAISS index
     try:
         faiss_index = faiss.read_index(local_faiss_index_file)
     except Exception as e:
         print(f"❌ Error loading FAISS index: {str(e)}")
-        return None, None, None
+        return None, None, None, None
     
     # Load text chunks
     try:
@@ -131,7 +132,7 @@ def cached_load_data_files():
                     text_chunks[int(parts[0])] = (parts[1], parts[2], parts[3])
     except Exception as e:
         print(f"❌ Error loading text chunks: {str(e)}")
-        return None, None, None
+        return None, None, None, None
     
     # Load metadata
     try:
@@ -142,10 +143,10 @@ def cached_load_data_files():
                 metadata_dict[item["Title"]] = item
     except Exception as e:
         print(f"❌ Error loading metadata: {str(e)}")
-        return None, None, None
+        return None, None, None, None
     
     print(f"✅ Data loaded successfully (cached): {len(text_chunks)} passages available")
-    return faiss_index, text_chunks, metadata_dict
+    return faiss_index, text_chunks, metadata_dict, openai_client
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -183,141 +184,143 @@ def setup_openai_client():
     Sets up OpenAI API authentication for generating answers using the LLM.
     
     Returns:
-        bool: True if initialization was successful, False otherwise
+        OpenAI: Configured OpenAI client instance, or None if initialization fails
     """
     try:
-        setup_openai_auth()
+        client = setup_openai_auth()
         print("✅ OpenAI client initialized successfully")
-        return True
+        return client
     except Exception as e:
         print(f"❌ OpenAI client initialization error: {str(e)}")
-        return False
+        return None
 
 def download_file_from_gcs(bucket, gcs_path, local_path):
     """
     Download a file from Google Cloud Storage to local storage.
     
-    Only downloads if the file isn't already present locally, avoiding redundant downloads.
+    Only downloads if the file doesn't already exist locally to avoid
+    redundant network transfers and improve startup time.
     
     Args:
         bucket: GCS bucket object
-        gcs_path (str): Path to the file in GCS
-        local_path (str): Local path where the file should be saved
+        gcs_path (str): Path to file in GCS bucket
+        local_path (str): Local path where file should be saved
         
     Returns:
-        bool: True if download was successful or file already exists, False otherwise
+        bool: True if download successful or file already exists, False otherwise
     """
     try:
         if os.path.exists(local_path):
-            print(f"File already exists locally: {local_path}")
+            print(f"âœ… File already exists locally: {local_path}")
             return True
-            
         blob = bucket.blob(gcs_path)
         blob.download_to_filename(local_path)
-        print(f"✅ Downloaded {gcs_path} → {local_path}")
+        print(f"âœ… Downloaded {gcs_path} → {local_path}")
         return True
     except Exception as e:
         print(f"❌ Error downloading {gcs_path}: {str(e)}")
         return False
 
-def average_pool(last_hidden_states, attention_mask):
+def get_embedding(text, tokenizer, model):
     """
-    Perform average pooling on model outputs for sentence embeddings.
-    
-    This function creates a fixed-size vector representation of a text sequence by averaging
-    the token embeddings, accounting for padding tokens using the attention mask.
-    
-    Args:
-        last_hidden_states: Hidden states output from the model
-        attention_mask: Attention mask indicating which tokens to include
-        
-    Returns:
-        torch.Tensor: Pooled representation of the input sequence
-    """
-    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
-    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
-
-# In-memory cache for query embeddings to avoid redundant computations
-query_embedding_cache = {}
-
-def get_embedding(text):
-    """
-    Generate embeddings for a text query using the cached model.
-    
-    Uses an in-memory cache to avoid redundant embedding generation for repeated queries.
-    Prefixes inputs with "query:" as required by the E5 model for search queries.
-    
-    Args:
-        text (str): The query text to embed
-        
-    Returns:
-        numpy.ndarray: The embedding vector or a zero vector if embedding fails
-    """
-    if text in query_embedding_cache:
-        return query_embedding_cache[text]
-
-    try:
-        tokenizer, model = cached_load_model()
-        if model is None:
-            print("Model is None, returning zero embedding")
-            return np.zeros((1, 1024), dtype=np.float32)
-            
-        # For E5 models, "query:" prefix is for questions. Passages use "passage:" prefix during preprocessing
-        input_text = f"query: {text}"
-        inputs = tokenizer(
-            input_text,
-            padding=True,
-            truncation=True,
-            return_tensors="pt",
-            max_length=512,
-            return_attention_mask=True
-        )
-        with torch.no_grad():
-            outputs = model(**inputs)
-            embeddings = average_pool(outputs.last_hidden_state, inputs['attention_mask'])
-            embeddings = nn.functional.normalize(embeddings, p=2, dim=1)
-            embeddings = embeddings.detach().cpu().numpy()
-        del outputs, inputs
-        gc.collect()
-        query_embedding_cache[text] = embeddings
-        return embeddings
-    except Exception as e:
-        print(f"❌ Embedding error: {str(e)}")
-        return np.zeros((1, 1024), dtype=np.float32)
-
-def retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5, similarity_threshold=0.5):
-    """
-    Retrieve the most relevant passages for a given spiritual query.
+    Generate a vector embedding for a given text using the E5-large-v2 model.
     
     This function:
-    1. Embeds the user query using the same model used for text chunks
-    2. Finds similar passages using the FAISS index with cosine similarity
-    3. Filters results based on similarity threshold to ensure relevance
-    4. Enriches results with metadata (title, author, publisher)
-    5. Ensures passage diversity by including only one passage per source title
+    1. Adds the required "query:" prefix for E5 model
+    2. Tokenizes the text
+    3. Runs it through the model
+    4. Performs mean pooling on the output
+    5. Normalizes the resulting vector
+    
+    Args:
+        text (str): Input text to embed
+        tokenizer: Hugging Face tokenizer
+        model: Hugging Face model
+        
+    Returns:
+        numpy.ndarray: Normalized embedding vector of shape (1024,) or None if error occurs
+    """
+    try:
+        device = torch.device("cpu")
+        prefixed_text = f"query: {text}"
+        inputs = tokenizer(prefixed_text, return_tensors="pt", truncation=True, max_length=512, padding=True)
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        
+        with torch.no_grad():
+            outputs = model(**inputs)
+        
+        # Mean pooling
+        attention_mask = inputs['attention_mask']
+        token_embeddings = outputs.last_hidden_state
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+        sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+        embedding = (sum_embeddings / sum_mask).cpu().numpy()
+        
+        # Normalize
+        embedding = embedding / np.linalg.norm(embedding)
+        
+        # Clean up
+        del inputs, outputs, token_embeddings, input_mask_expanded, sum_embeddings, sum_mask
+        gc.collect()
+        
+        return embedding
+    except Exception as e:
+        print(f"❌ Error generating embedding: {str(e)}")
+        return None
+
+# =============================================================================
+# RAG PIPELINE FUNCTIONS
+# =============================================================================
+
+def retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5):
+    """
+    Retrieve the most relevant text passages for a given query.
+    
+    This function:
+    1. Generates an embedding for the user's query
+    2. Searches the FAISS index for similar passages
+    3. Deduplicates results to ensure variety of sources
+    4. Returns passages with their metadata
     
     Args:
         query (str): The user's spiritual question
         faiss_index: FAISS index containing passage embeddings
-        text_chunks (dict): Dictionary mapping IDs to text chunks and metadata
-        metadata_dict (dict): Dictionary containing publication information
-        top_k (int): Maximum number of passages to retrieve
-        similarity_threshold (float): Minimum similarity score (0.0-1.0) for retrieved passages
+        text_chunks (dict): Dictionary mapping IDs to (title, author, text) tuples
+        metadata_dict (dict): Dictionary mapping titles to full metadata
+        top_k (int): Number of unique sources to retrieve
         
     Returns:
-        tuple: (retrieved_passages, retrieved_sources) containing the text and source information
+        tuple: (list of passage texts, list of (title, author, publisher) tuples)
     """
     try:
-        print(f"\n🔍 Retrieving passages for query: {query}")
-        query_embedding = get_embedding(query)
-        distances, indices = faiss_index.search(query_embedding, top_k * 2)
-        print(f"Found {len(distances[0])} potential matches")
+        print(f"🔍 Retrieving passages for query: {query}")
+        tokenizer, model = cached_load_model()
+        if tokenizer is None or model is None:
+            print("❌ Model not available")
+            return [], []
+        
+        query_embedding = get_embedding(query, tokenizer, model)
+        if query_embedding is None:
+            print("❌ Failed to generate query embedding")
+            return [], []
+        
+        # Search FAISS index
+        # Request more results initially to allow for deduplication
+        search_k = min(top_k * 3, faiss_index.ntotal)
+        distances, indices = faiss_index.search(query_embedding.astype(np.float32), search_k)
+        
+        print(f"Found {len(indices[0])} potential matches")
+        for i, (dist, idx) in enumerate(zip(distances[0][:10], indices[0][:10])):
+            print(f"Distance: {dist:.4f}, Index: {idx}")
+        
+        # Deduplicate by title
         retrieved_passages = []
         retrieved_sources = []
         cited_titles = set()
-        for dist, idx in zip(distances[0], indices[0]):
-            print(f"Distance: {dist:.4f}, Index: {idx}")
-            if idx in text_chunks and dist >= similarity_threshold:
+        
+        for idx in indices[0]:
+            if idx < len(text_chunks):
                 title_with_txt, author, text = text_chunks[idx]
                 clean_title = title_with_txt.replace(".txt", "") if title_with_txt.endswith(".txt") else title_with_txt
                 clean_title = unicodedata.normalize("NFC", clean_title)
@@ -337,7 +340,7 @@ def retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5, s
         print(f"❌ Error in retrieve_passages: {str(e)}")
         return [], []
 
-def answer_with_llm(query, context=None, word_limit=200):
+def answer_with_llm(query, openai_client, context=None, word_limit=200):
     """
     Generate an answer using the OpenAI GPT model with formatted citations.
     
@@ -353,6 +356,7 @@ def answer_with_llm(query, context=None, word_limit=200):
     
     Args:
         query (str): The user's spiritual question
+        openai_client (OpenAI): Configured OpenAI client instance
         context (list, optional): List of (source_info, text) tuples for context
         word_limit (int): Maximum word count for the generated answer
         
@@ -404,7 +408,7 @@ def answer_with_llm(query, context=None, word_limit=200):
             print("❌ Error: LLM model not found in secrets")
             return "I apologize, but I am unable to answer at the moment."
             
-        response = openai.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model=llm_model,
             messages=[
                 {"role": "system", "content": system_message},
@@ -470,9 +474,9 @@ def cached_process_query(query, top_k=5, word_limit=200):
     """
     print(f"\n🔍 Processing query (cached): {query}")
     # Load all necessary data resources (with caching)
-    faiss_index, text_chunks, metadata_dict = cached_load_data_files()
+    faiss_index, text_chunks, metadata_dict, openai_client = cached_load_data_files()
     # Handle missing data gracefully
-    if faiss_index is None or text_chunks is None or metadata_dict is None:
+    if faiss_index is None or text_chunks is None or metadata_dict is None or openai_client is None:
         return {
             "query": query, 
             "answer_with_rag": "⚠️ System error: Data files not loaded properly.", 
@@ -491,7 +495,7 @@ def cached_process_query(query, top_k=5, word_limit=200):
     # Step 3: Generate the answer if relevant context was found
     if retrieved_context:
         context_with_sources = list(zip(retrieved_sources, retrieved_context))
-        llm_answer_with_rag = answer_with_llm(query, context_with_sources, word_limit=word_limit)
+        llm_answer_with_rag = answer_with_llm(query, openai_client, context_with_sources, word_limit=word_limit)
     else:
         llm_answer_with_rag = "⚠️ No relevant context found."
     # Return the complete response package

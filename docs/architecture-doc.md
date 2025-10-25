@@ -96,9 +96,9 @@ def cached_process_query(query, top_k=5, word_limit=200):
     """
     print(f"\n🔍 Processing query (cached): {query}")
     # Load all necessary data resources (with caching)
-    faiss_index, text_chunks, metadata_dict = cached_load_data_files()
+    faiss_index, text_chunks, metadata_dict, openai_client = cached_load_data_files()
     # Handle missing data gracefully
-    if faiss_index is None or text_chunks is None or metadata_dict is None:
+    if faiss_index is None or text_chunks is None or metadata_dict is None or openai_client is None:
         return {
             "query": query, 
             "answer_with_rag": "⚠️ System error: Data files not loaded properly.", 
@@ -117,7 +117,7 @@ def cached_process_query(query, top_k=5, word_limit=200):
     # Step 3: Generate the answer if relevant context was found
     if retrieved_context:
         context_with_sources = list(zip(retrieved_sources, retrieved_context))
-        llm_answer_with_rag = answer_with_llm(query, context_with_sources, word_limit=word_limit)
+        llm_answer_with_rag = answer_with_llm(query, openai_client, context_with_sources, word_limit=word_limit)
     else:
         llm_answer_with_rag = "⚠️ No relevant context found."
     # Return the complete response package
@@ -148,16 +148,15 @@ def process_query(query, top_k=5, word_limit=200):
 - Adds metadata to the retrieved passages
 
 ```python
-ddef retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5, similarity_threshold=0.5):
+def retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5):
     """
     Retrieve the most relevant passages for a given spiritual query.
     
     This function:
     1. Embeds the user query using the same model used for text chunks
     2. Finds similar passages using the FAISS index with cosine similarity
-    3. Filters results based on similarity threshold to ensure relevance
-    4. Enriches results with metadata (title, author, publisher)
-    5. Ensures passage diversity by including only one passage per source title
+    3. Enriches results with metadata (title, author, publisher)
+    4. Ensures passage diversity by including only one passage per source title
     
     Args:
         query (str): The user's spiritual question
@@ -165,22 +164,37 @@ ddef retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5, 
         text_chunks (dict): Dictionary mapping IDs to text chunks and metadata
         metadata_dict (dict): Dictionary containing publication information
         top_k (int): Maximum number of passages to retrieve
-        similarity_threshold (float): Minimum similarity score (0.0-1.0) for retrieved passages
         
     Returns:
         tuple: (retrieved_passages, retrieved_sources) containing the text and source information
     """
     try:
         print(f"\n🔍 Retrieving passages for query: {query}")
-        query_embedding = get_embedding(query)
-        distances, indices = faiss_index.search(query_embedding, top_k * 2)
-        print(f"Found {len(distances[0])} potential matches")
+        tokenizer, model = cached_load_model()
+        if tokenizer is None or model is None:
+            print("❌ Model not available")
+            return [], []
+        
+        query_embedding = get_embedding(query, tokenizer, model)
+        if query_embedding is None:
+            print("❌ Failed to generate query embedding")
+            return [], []
+        
+        # Search FAISS index
+        search_k = min(top_k * 3, faiss_index.ntotal)
+        distances, indices = faiss_index.search(query_embedding.astype(np.float32), search_k)
+        
+        print(f"Found {len(indices[0])} potential matches")
+        for i, (dist, idx) in enumerate(zip(distances[0][:10], indices[0][:10])):
+            print(f"Distance: {dist:.4f}, Index: {idx}")
+        
+        # Deduplicate by title
         retrieved_passages = []
         retrieved_sources = []
         cited_titles = set()
-        for dist, idx in zip(distances[0], indices[0]):
-            print(f"Distance: {dist:.4f}, Index: {idx}")
-            if idx in text_chunks and dist >= similarity_threshold:
+        
+        for idx in indices[0]:
+            if idx < len(text_chunks):
                 title_with_txt, author, text = text_chunks[idx]
                 clean_title = title_with_txt.replace(".txt", "") if title_with_txt.endswith(".txt") else title_with_txt
                 clean_title = unicodedata.normalize("NFC", clean_title)
@@ -208,7 +222,7 @@ ddef retrieve_passages(query, faiss_index, text_chunks, metadata_dict, top_k=5, 
 - Formats the output with proper citations
 
 ```python
-def answer_with_llm(query, context=None, word_limit=200):
+def answer_with_llm(query, openai_client, context=None, word_limit=200):
     """
     Generate an answer using the OpenAI GPT model with formatted citations.
     
@@ -224,6 +238,7 @@ def answer_with_llm(query, context=None, word_limit=200):
     
     Args:
         query (str): The user's spiritual question
+        openai_client (OpenAI): Configured OpenAI client instance
         context (list, optional): List of (source_info, text) tuples for context
         word_limit (int): Maximum word count for the generated answer
         
@@ -275,7 +290,7 @@ def answer_with_llm(query, context=None, word_limit=200):
             print("❌ Error: LLM model not found in secrets")
             return "I apologize, but I am unable to answer at the moment."
             
-        response = openai.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model=llm_model,
             messages=[
                 {"role": "system", "content": system_message},
@@ -296,79 +311,92 @@ def answer_with_llm(query, context=None, word_limit=200):
     except Exception as e:
         print(f"❌ LLM API error: {str(e)}")
         return "I apologize, but I am unable to answer at the moment."
+```
 
 ### 3. Data Layer
 
-The data layer stores and manages the embedded text chunks, metadata, and vector indices:
+The data layer provides persistent storage of spiritual texts, embeddings, and metadata:
 
 #### FAISS Index
-- Stores vector embeddings of all text chunks
-- Enables efficient similarity search with cosine similarity
-- Provides fast retrieval for Anveshak
-
-```python
-# Building the FAISS index (during preprocessing)
-dimension = all_embeddings.shape[1]
-index = faiss.IndexFlatIP(dimension)  # Inner product (cosine similarity for normalized vectors)
-index.add(all_embeddings)
-```
+- Contains vector embeddings of all text passages
+- Optimized for cosine similarity search
+- Stored in Google Cloud Storage for persistence
 
 #### Text Chunks
-- Contains the actual text content split into manageable chunks
-- Stores text with unique identifiers that map to the FAISS index
-- Formatted as tab-separated values with IDs, titles, authors, and content
-
-```
-# Format of text_chunks.txt
-ID  Title  Author  Text_Content
-0   Bhagavad Gita   Vyasa   The supreme Lord said: I have taught this imperishable yoga to Vivasvan...
-1   Yoga Sutras Patanjali   Yogas chitta vritti nirodhah - Yoga is the stilling of the fluctuations...
-...
-```
+- Original text passages from spiritual texts
+- Each passage linked to its source title and author
+- Stored as a tab-separated values file
 
 #### Metadata
-- Stores additional information about each source text
-- Includes author information, publisher details, copyright information, and more
-- Used to provide accurate citations for answers
+- Publication information (title, author, publisher)
+- Stored in JSONL format (one JSON object per line)
+- Used to enrich retrieval results with source information
 
-```json
-// Example metadata.jsonl entry
-{"Title": "Example Title", "Author": "Example Author", "Publisher": "Example Publisher", "URL": "https://example.com", "Uploaded": true}
-```
-
-## Data Flow and Processing
-
-### 1. Preprocessing Pipeline
-
-The preprocessing pipeline runs offline to prepare the text corpus:
+## Data Flow
 
 ```
-Raw Texts → Cleaning → Chunking → Embedding → Indexing → GCS Storage
+User Query → Query Processing → Embedding Generation → FAISS Search
+     ↓                                                      ↓
+Retrieved Passages ← Text Chunk Lookup ← Top-K Indices ←─┘
+     ↓
+Metadata Enrichment
+     ↓
+Context Assembly → LLM Generation → Answer with Citations → User
 ```
 
-Each step is handled by specific functions in the `preprocessing.py` script:
+## Key Technical Components
 
-1. **Text Collection**: Texts are collected from various sources and uploaded to Google Cloud Storage
-2. **Text Cleaning**: HTML and formatting artifacts are removed using `rigorous_clean_text()`
-3. **Text Chunking**: Long texts are split into manageable chunks with `chunk_text()`
-4. **Embedding Generation**: Text chunks are converted to vector embeddings using `create_embeddings()`
-5. **Index Building**: Embeddings are added to a FAISS index for efficient retrieval
-6. **Storage**: All processed data is stored in Google Cloud Storage for Anveshak to access
+### Embedding Generation
+- Uses E5-large-v2 model from Hugging Face
+- Generates 1024-dimensional embeddings
+- Applies mean pooling and normalization
+- Prefixes query text with "query:" for optimal performance
 
-### 2. Query Processing Flow
-
-When a user submits a question, the system follows this flow:
-
-1. **Query Embedding**: The user's question is embedded using the same model as the text corpus
-2. **Similarity Search**: The query embedding is compared against the FAISS index to find similar text chunks
-3. **Context Assembly**: Retrieved chunks are combined with their metadata to form the context
-4. **Answer Generation**: The context and query are sent to the Large Language Model (LLM) to generate an answer
-5. **Citation Formatting**: Sources are formatted as citations to accompany the answer
-6. **Result Presentation**: The answer and citations are displayed to the user
-
-## Caching Strategy
-
-Anveshak implements a multi-level caching strategy to optimize performance:
+```python
+def get_embedding(text, tokenizer, model):
+    """
+    Generate a vector embedding for a given text using the E5-large-v2 model.
+    
+    This function:
+    1. Adds the required "query:" prefix for E5 model
+    2. Tokenizes the text
+    3. Runs it through the model
+    4. Performs mean pooling on the output
+    5. Normalizes the resulting vector
+    
+    Args:
+        text (str): Input text to embed
+        tokenizer: Hugging Face tokenizer
+        model: Hugging Face model
+        
+    Returns:
+        numpy.ndarray: Normalized embedding vector of shape (1024,) or None if error occurs
+    """
+    try:
+        device = torch.device("cpu")
+        prefixed_text = f"query: {text}"
+        inputs = tokenizer(prefixed_text, return_tensors="pt", truncation=True, max_length=512, padding=True)
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        
+        with torch.no_grad():
+            outputs = model(**inputs)
+        
+        # Mean pooling
+        attention_mask = inputs['attention_mask']
+        token_embeddings = outputs.last_hidden_state
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+        sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+        embedding = (sum_embeddings / sum_mask).cpu().numpy()
+        
+        # Normalize
+        embedding = embedding / np.linalg.norm(embedding)
+        
+        return embedding
+    except Exception as e:
+        print(f"❌ Error generating embedding: {str(e)}")
+        return None
+```
 
 ### Resource Caching
 - Model and data files are cached using `@st.cache_resource`
@@ -381,7 +409,7 @@ def cached_load_model():
     
 @st.cache_resource(show_spinner=False)
 def cached_load_data_files():
-    # Load FAISS index, text chunks, and metadata once and cache them
+    # Load FAISS index, text chunks, metadata, and OpenAI client once and cache them
 ```
 
 ### Data Caching
@@ -399,10 +427,8 @@ def cached_process_query(query, top_k=5, word_limit=200):
 - Prevents unnecessary recomputation during re-renders
 
 ```python
-...
 if 'initialized' not in st.session_state:
     st.session_state.initialized = False
-...    
 if 'last_query' not in st.session_state:
     st.session_state.last_query = ""
 # ... and more session state variables
@@ -411,13 +437,6 @@ if 'last_query' not in st.session_state:
 ## Authentication and Security
 
 Anveshak uses two authentication systems:
-
-### Google Cloud Storage Authentication
-- Authenticates with GCS to access stored data
-- Uses service account credentials stored securely
-
-```python
-Anveshak: Spirituality Q&A uses two authentication systems:
 
 ### Google Cloud Storage Authentication
 - Authenticates with GCS to access stored data
@@ -435,24 +454,31 @@ def setup_gcp_auth():
     
     Note: In production, credentials are stored exclusively in HF Spaces secrets.
     """
-    # Try multiple authentication methods and return credentials.```
+    # Try multiple authentication methods and return credentials
+```
 
 ### OpenAI API Authentication
 - Authenticates with OpenAI to use their LLM API
 - Uses API key stored securely
+- Returns configured OpenAI client instance with httpx for proxy handling
 
 ```python
 def setup_openai_auth():
     """Setup OpenAI API authentication using various methods.
     
     This function tries multiple authentication methods in order of preference:
-    1. Standard environment variable (OPENAI_API_KEY)
-    2. HF Spaces environment variable (OPENAI_KEY) - primary production method
+    1. HF Spaces environment variable (OPENAI_API_KEY) - primary production method
+    2. Standard local environment variable (OPENAI_KEY)
     3. Streamlit secrets (openai_api_key)
+    
+    Uses httpx.Client() to handle HF Spaces proxy environment variables properly.
+    
+    Returns:
+        OpenAI: Configured OpenAI client instance
     
     Note: In production, the API key is stored exclusively in HF Spaces secrets.
     """
-    # Try multiple authentication methods to set up the API key
+    # Try multiple authentication methods and return configured client
 ```
 
 ## Privacy Considerations
@@ -524,7 +550,7 @@ The deployment process involves:
    - Mitigation: Text chunks are limited to 500 words, and only a subset of the most relevant chunks are included in the context.
 
 2. **Embedding Model Accuracy**: No embedding model perfectly captures the semantics of spiritual texts.
-   - Mitigation: Use of a high-quality embedding model (E5-large-v2) and a similarity threshold to filter out less relevant results.
+   - Mitigation: Use of a high-quality embedding model (E5-large-v2) and retrieval of multiple passages to ensure coverage.
 
 3. **Resource Constraints**: Hugging Face Spaces has limited computational resources.
    - Mitigation: Forcing CPU usage for the embedding model, implementing aggressive caching, and optimizing memory usage.

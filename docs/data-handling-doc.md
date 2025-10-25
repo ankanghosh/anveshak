@@ -315,25 +315,26 @@ These files are loaded with caching to improve performance, using the actual imp
 @st.cache_resource(show_spinner=False)
 def cached_load_data_files():
     """
-    Cached version of load_data_files() for FAISS index, text chunks, and metadata.
+    Cached version of load_data_files() for FAISS index, text chunks, metadata, and OpenAI client.
     
     This function loads:
     - FAISS index for vector similarity search
     - Text chunks containing the original spiritual text passages
     - Metadata dictionary with publication and author information
+    - OpenAI client instance for answer generation
     
     All files are downloaded from Google Cloud Storage if not already present locally.
     
     Returns:
-        tuple: (faiss_index, text_chunks, metadata_dict) or (None, None, None) if loading fails
+        tuple: (faiss_index, text_chunks, metadata_dict, openai_client) or (None, None, None, None) if loading fails
     """
     # Initialize GCP and OpenAI clients
     bucket = setup_gcp_client()
-    openai_initialized = setup_openai_client()
+    openai_client = setup_openai_client()
     
-    if not bucket or not openai_initialized:
+    if not bucket or not openai_client:
         print("Failed to initialize required services")
-        return None, None, None
+        return None, None, None, None
     
     # Get GCS paths from secrets - required
     try:
@@ -343,7 +344,7 @@ def cached_load_data_files():
         text_chunks_file_gcs = st.secrets["CHUNKS_PATH_GCS"]
     except KeyError as e:
         print(f"❌ Error: Required GCS path not found in secrets: {e}")
-        return None, None, None
+        return None, None, None, None
     
     # Download necessary files if not already present locally
     success = True
@@ -353,14 +354,14 @@ def cached_load_data_files():
     
     if not success:
         print("Failed to download required files")
-        return None, None, None
+        return None, None, None, None
     
     # Load FAISS index, text chunks, and metadata
     try:
         faiss_index = faiss.read_index(local_faiss_index_file)
     except Exception as e:
         print(f"❌ Error loading FAISS index: {str(e)}")
-        return None, None, None
+        return None, None, None, None
     
     # Load text chunks
     try:
@@ -372,7 +373,7 @@ def cached_load_data_files():
                     text_chunks[int(parts[0])] = (parts[1], parts[2], parts[3])
     except Exception as e:
         print(f"❌ Error loading text chunks: {str(e)}")
-        return None, None, None
+        return None, None, None, None
     
     # Load metadata
     try:
@@ -383,10 +384,10 @@ def cached_load_data_files():
                 metadata_dict[item["Title"]] = item
     except Exception as e:
         print(f"❌ Error loading metadata: {str(e)}")
-        return None, None, None
+        return None, None, None, None
     
     print(f"✅ Data loaded successfully (cached): {len(text_chunks)} passages available")
-    return faiss_index, text_chunks, metadata_dict
+    return faiss_index, text_chunks, metadata_dict, openai_client
 ```
 
 ## Data Access During Query Processing
@@ -537,7 +538,7 @@ This privacy-first approach ensures that users can freely explore spiritual ques
 To respect copyright and ensure fair use, answers are limited to a configurable word count using the actual implementation from rag_engine.py:
 
 ```python
-def answer_with_llm(query, context=None, word_limit=200):
+def answer_with_llm(query, openai_client, context=None, word_limit=200):
     # ... LLM processing ...
     
     # Extract and format the answer

@@ -2,7 +2,8 @@ import os
 import json
 from google.oauth2 import service_account
 import streamlit as st
-import openai
+from openai import OpenAI
+import httpx
 
 def setup_gcp_auth():
     """
@@ -90,6 +91,9 @@ def setup_openai_auth():
     Note: In production, we exclusively use HF Spaces secrets for storing the OpenAI API key.
     The other methods are included for development flexibility and completeness.
     
+    Returns:
+        OpenAI: Configured OpenAI client instance
+        
     Raises:
         ValueError: If no valid API key is found
         Exception: For any authentication errors
@@ -97,24 +101,28 @@ def setup_openai_auth():
     try:
         # Option 1: HF Spaces environment variable (primary method)
         if "OPENAI_API_KEY" in os.environ:
-            openai.api_key = os.getenv("OPENAI_API_KEY")
+            api_key = os.getenv("OPENAI_API_KEY")
             print("✅ Using OpenAI API key from HF Spaces environment variable")
-            return
             
         # Option 2: Standard local environment variable
         elif "OPENAI_KEY" in os.environ:
-            openai.api_key = os.getenv("OPENAI_KEY")
+            api_key = os.getenv("OPENAI_KEY")
             print("✅ Using OpenAI API key from standard local environment variable")
-            return
             
         # Option 3: Streamlit secrets
         elif "openai_api_key" in st.secrets:
-            openai.api_key = st.secrets["openai_api_key"]
+            api_key = st.secrets["openai_api_key"]
             print("✅ Using OpenAI API key from Streamlit secrets")
-            return
             
         else:
             raise ValueError("No OpenAI API key found in environment or Streamlit secrets")
+        
+        # Initialize and return OpenAI client
+        # Use httpx explicitly to handle HF Spaces proxy environment variables
+        # httpx.Client() automatically respects HTTP_PROXY/HTTPS_PROXY environment variables
+        http_client = httpx.Client()
+        client = OpenAI(api_key=api_key, http_client=http_client)
+        return client
             
     except Exception as e:
         error_msg = f"❌ OpenAI authentication error: {str(e)}"
@@ -132,8 +140,8 @@ def setup_all_auth():
     In production, authentication credentials are stored exclusively in HF Spaces secrets.
     
     Returns:
-        google.oauth2.service_account.Credentials: GCP credentials object
+        tuple: (GCP credentials object, OpenAI client instance)
     """
     gcp_creds = setup_gcp_auth()
-    setup_openai_auth()
-    return gcp_creds
+    openai_client = setup_openai_auth()
+    return gcp_creds, openai_client
